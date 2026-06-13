@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/engine/nn",
+    "crates/engine/nn-bench",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+authors = ["Arian"]
+license = "Proprietary"
+
+# Profiles carried over from the simulator monorepo so the documented bench /
+# wasm builds work (e.g. `cargo run --profile release-bench --example
+# matmul_bench -p nn`).
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
+[profile.release-bench]
+inherits = "release"
+lto      = "fat"
+debug    = false
+
+[profile.release-wasm]
+inherits = "release"
+opt-level = "s"
+lto       = "fat"
+panic     = "abort"
+strip     = true

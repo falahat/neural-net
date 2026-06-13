@@ -1,0 +1,63 @@
+[package]
+name = "nn"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "nn"
+doctest = false
+
+# See docs/designs/neural_network_library.md for the constitutional
+# constraints. The short version: every line of code in this crate is
+# written by us; borrowed *ideas* (algorithms, design shapes) are cited
+# at point-of-use. Dependencies are kept to std + tiny feature-gated
+# optional crates.
+
+[features]
+default = []
+# WASM widget bridge (wasm-bindgen surface in src/wasm.rs).
+wasm = ["dep:wasm-bindgen", "dep:js-sys"]
+# Portable f32x8 SIMD via the `wide` crate. See backend/simd.rs.
+simd = ["dep:wide"]
+# Multi-threaded CPU sgemm via the `gemm` crate (Faer). Wins big at
+# RL-mid and above (~30× over our scalar). NOTE: parallel reduction
+# is NOT bit-deterministic; `tests/determinism.rs` skips itself when
+# this feature is on. See backend/parallel.rs.
+parallel = ["dep:gemm"]
+# GPU backend via cubecl (Rust → WGSL / CUDA JIT compiler from tracel-ai).
+# Default-on uses the wgpu runtime (works everywhere incl. browser);
+# enable `gpu-cuda` instead for native CUDA. See backend/gpu.rs.
+#
+# **Bring-up note:** as of cubecl 0.7 + wgpu 22, the Windows DX12
+# transitive `windows-0.58` ↔ `windows-core-0.54` mismatch can break
+# the build. See `src/backend/gpu.rs` module docstring for the
+# `[patch.crates-io]` one-liner that fixes it; on Linux / macOS the
+# default resolution works.
+gpu      = ["dep:cubecl", "cubecl/wgpu", "dep:wgpu", "dep:pollster"]
+gpu-cuda = ["dep:cubecl", "cubecl/cuda", "dep:wgpu", "dep:pollster"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+js-sys       = { version = "0.3", optional = true }
+# `wide` is the minimal portable-SIMD crate on stable Rust. We use it
+# for f32x8 element-wise operations and the inner loop of matmul.
+# Not pulled in by default — the scalar backend already passes every
+# test; SIMD is purely about speed.
+wide         = { version = "0.7", optional = true }
+# `gemm` (Faer/Sarah Williams) is the production-grade Rust sgemm
+# crate — hand-tuned BLIS-style microkernel + rayon-based multi-
+# threading. Behind `--features parallel`. Same crate candle uses.
+gemm         = { version = "0.18", optional = true }
+# CubeCL — Rust-DSL JIT compiler for GPU kernels (from tracel-ai).
+# We pick this over raw wgpu+WGSL because the kernel description
+# stays in Rust (preserves the "every line ours" constraint) while
+# CubeCL compiles it to the target's native shader language.
+cubecl       = { version = "0.6.0", optional = true, default-features = false }
+# wgpu + pollster — used by `backend/gpu.rs::log_adapter_once()` to
+# enumerate physical adapters and verify we're running on the
+# discrete GPU (not the integrated one) on laptops with both. Pulled
+# in transitively by cubecl's wgpu runtime anyway; declaring them
+# explicitly so we control the version.
+wgpu         = { version = "25", optional = true }
+pollster     = { version = "0.4", optional = true }

@@ -1,0 +1,97 @@
+[package]
+name = "nn-bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+# Shared benchmark harness + per-library example drivers.
+# Lives in its own crate so peer-library deps (candle, ndarray,
+# matrixmultiply, dfdx, burn) don't pollute `nn`'s dep tree.
+#
+# Each example here writes JSON into `crates/engine/nn/bench_results/`
+# in the schema v2 format that `build_viz` ingests. Schema is
+# defined in `crates/engine/nn/bench_results/README.md` and produced
+# via this crate's `lib.rs`.
+
+[lib]
+name = "nn_bench"
+
+[features]
+default = []
+# Pull in candle-core for the candle peer benchmark example.
+candle = ["dep:candle-core"]
+# candle-cuda activates candle-core's `cuda` feature. NVIDIA only;
+# requires CUDA toolkit installed.
+candle-cuda = ["candle", "candle-core/cuda"]
+# Pull in burn + burn-ndarray for the burn peer benchmark.
+burn   = ["dep:burn"]
+# Pull in dfdx for the dfdx peer benchmark.
+dfdx   = ["dep:dfdx"]
+# Pull in tch-rs for the libtorch peer benchmark. Requires
+# libtorch installed on the build machine + the `LIBTORCH` env
+# var (or `LIBTORCH_USE_PYTORCH=1`). See tch-rs README.
+tch    = ["dep:tch"]
+# Forward the nn library's SIMD feature so `nn_own` can be run
+# both scalar (default) and SIMD via `--features simd`.
+simd = ["nn/simd"]
+# Forward the nn library's `parallel` feature (gemm crate for
+# multi-threaded CPU sgemm).
+parallel = ["nn/parallel"]
+# Forward the nn library's `gpu` feature (cubecl wgpu backend).
+# Drives a separate `nn_gpu` example.
+gpu = ["nn/gpu"]
+
+[dependencies]
+# The library we're benchmarking — only used by the `own` example.
+nn          = { path = "../nn" }
+# System metrics (CPU / RAM / threads) — same setup as nn's dev-deps.
+sysinfo     = { version = "0.32", default-features = false, features = ["system", "disk"] }
+nvml-wrapper = "0.10"
+
+# Peer libraries — small / pure-Rust deps live here unconditionally
+# (negligible compile cost; this is a bench crate, not a library).
+ndarray         = "0.16"
+matrixmultiply  = "0.3"
+candle-core     = { version = "0.10", optional = true, default-features = false }
+# `burn` umbrella crate bringing in burn-tensor + burn-ndarray
+# backend. Each peer driver picks its own backend; we use
+# ndarray for a fair single-threaded CPU comparison.
+burn            = { version = "0.16", optional = true, default-features = false, features = ["ndarray", "std"] }
+# `dfdx` — compile-time shape checking via const generics.
+dfdx            = { version = "0.13", optional = true, default-features = false, features = ["std", "fast-alloc", "cpu"] }
+# `tch-rs` — Rust bindings to libtorch. Requires libtorch
+# installed; see tch-rs README for setup.
+tch             = { version = "0.18", optional = true }
+
+[[example]]
+name = "nn_own"
+path = "examples/nn_own.rs"
+
+[[example]]
+name = "ndarray_mm"
+path = "examples/ndarray_mm.rs"
+
+[[example]]
+name = "candle"
+path = "examples/candle.rs"
+required-features = ["candle"]
+
+[[example]]
+name = "burn"
+path = "examples/burn.rs"
+required-features = ["burn"]
+
+[[example]]
+name = "dfdx"
+path = "examples/dfdx.rs"
+required-features = ["dfdx"]
+
+[[example]]
+name = "tch"
+path = "examples/tch.rs"
+required-features = ["tch"]
+
+[[example]]
+name = "nn_gpu"
+path = "examples/nn_gpu.rs"
+required-features = ["gpu"]
