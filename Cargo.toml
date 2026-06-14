@@ -10,7 +10,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.88"
 authors = ["Arian"]
-license = "Proprietary"
+license = "GPL-3.0-or-later"
 
 # Profiles carried over from the simulator monorepo so the documented bench /
 # wasm builds work (e.g. `cargo run --profile release-bench --example
